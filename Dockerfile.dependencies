@@ -1,0 +1,116 @@
+# Pull base image.
+FROM ubuntu:20.04
+
+# This is needed to prevent locales installation from being interactive.
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+        build-essential scons autoconf automake libtool make g++ \
+        git pkg-config \
+        wget ed curl bzip2 libbz2-dev unzip libarchive-tools \
+        openssh-client libssl-dev \
+        libjsoncpp-dev flex javacc bison libbison-dev openjdk-8-jdk \
+        libgflags-dev libgtest-dev \
+        libavcodec-dev libavformat-dev libswscale-dev \
+        libboost-all-dev \
+        libtbb-dev \
+        locales \
+        intel-mkl \
+        libjpeg-dev libpng-dev libtiff-dev \
+        libopenblas-dev && \
+    apt-get remove -y libprotobuf-dev protobuf-compiler && \
+    rm -rf /var/lib/apt/lists/* /root/.cache
+
+# CMake
+RUN wget -q https://cmake.org/files/v3.20/cmake-3.20.0.tar.gz && \
+    tar -xzvf cmake-3.20.0.tar.gz && cd cmake-3.20.0/ && \
+    ./bootstrap && make -j6 && make install
+
+# Google Logging
+RUN wget -q https://github.com/google/glog/archive/refs/tags/v0.5.0.tar.gz && \
+    tar -xzvf v0.5.0.tar.gz && cd glog-0.5.0 && \
+    cmake -S . -B build -G "Unix Makefiles" -DWITH_CUSTOM_PREFIX=ON && \
+    cmake --build build -DGLOG_CUSTOM_PREFIX_SUPPORT --target install && \
+    rm -rf /glog-0.5.0
+
+# Google Test
+RUN cd /usr/src/gtest && cmake . && make && mv ./lib/libgtest* /usr/local/lib/
+
+# Install locale
+RUN sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
+    dpkg-reconfigure --frontend=noninteractive locales
+
+# Protobuf
+RUN wget -q https://github.com/protocolbuffers/protobuf/archive/v3.9.0.tar.gz && \
+    tar xf v3.9.0.tar.gz && rm v3.9.0.tar.gz && \
+    cd protobuf-3.9.0 && ./autogen.sh &&  \
+    ./configure --prefix=/usr/local && \
+    make -j6 && \
+    make install && ldconfig && \
+    rm -rf /protobuf-3.9.0
+
+# OpenCV
+RUN wget -q https://github.com/opencv/opencv/archive/4.3.0.tar.gz && \
+    tar xf 4.3.0.tar.gz && rm 4.3.0.tar.gz && \
+    cd opencv-4.3.0 && mkdir build && cd build && \
+    cmake                                               \
+        -D CMAKE_BUILD_TYPE=Release                     \
+        -D WITH_TBB=ON -D WITH_OPENMP=ON -D WITH_IPP=ON \
+        -D CPU_DISPATCH=SSE4_2,AVX,AVX2                 \
+        -D BUILD_EXAMPLES=OFF                           \
+        -D BUILD_DOCS=OFF                               \
+        -D BUILD_PERF_TESTS=OFF                         \
+        -D BUILD_TESTS=OFF                              \
+        -D BUILD_opencv_apps=OFF                        \
+        -D CMAKE_INSTALL_PREFIX=/usr/local .. &&        \
+    make -j6 && make install && \
+    rm -rf /opencv-4.3.0
+
+# TileDB
+RUN wget -q https://github.com/TileDB-Inc/TileDB/archive/1.3.1.tar.gz && \
+    tar xf 1.3.1.tar.gz && rm 1.3.1.tar.gz && \
+    cd TileDB-1.3.1 && mkdir build && cd build && \
+    ../bootstrap --prefix=/usr/local/ && make -j6 && make install-tiledb && \
+    rm -rf /TileDB-1.3.1
+
+# Faiss
+RUN wget -q https://github.com/facebookresearch/faiss/archive/v1.7.0.tar.gz && \
+    tar xf v1.7.0.tar.gz && rm v1.7.0.tar.gz && \
+    cd faiss-1.7.0 && mkdir build && cd build && \
+    cmake                             \
+        -D FAISS_ENABLE_GPU=OFF       \
+        -D FAISS_ENABLE_PYTHON=OFF    \
+        -D BUILD_TESTING=OFF          \
+        -D BUILD_SHARED_LIBS=ON       \
+        -D CMAKE_BUILD_TYPE=Release   \
+        -D FAISS_OPT_LEVEL=avx2 .. && \
+    make -j6 && make install && \
+    ln -s /usr/local/lib/libfaiss_avx2.so /usr/local/lib/libfaiss.so && \
+    rm -rf /faiss-1.7*
+
+# Valijson
+RUN wget -q https://github.com/tristanpenman/valijson/archive/v0.2.tar.gz && \
+    tar xf v0.2.tar.gz && rm v0.2.tar.gz && \
+    cd valijson-0.2 && \
+    cp -r include/* /usr/local/include/ && \
+    rm -r /valijson-0.2
+
+# JSON for Modern C++
+
+RUN wget -q https://github.com/nlohmann/json/archive/refs/tags/v3.10.2.zip && \
+    unzip v3.10.2.zip -d /usr/local/src && \
+    rm v3.10.2.zip && \
+    cmake -S /usr/local/src/json-3.10.2 -B /usr/local/build/nlohmann-json -DCMAKE_BUILD_TYPE=Release -DJSON_BuildTests=OFF && \
+    cmake --build /usr/local/build/nlohmann-json --target install && \
+    rm -rf /usr/local/build/nlohmann-json /usr/local/src/json-3.10.2
+
+#Install prometheus-cpp
+RUN wget -q https://github.com/jupp0r/prometheus-cpp/releases/download/v1.0.0/prometheus-cpp-with-submodules.tar.gz && \
+    tar xf prometheus-cpp-with-submodules.tar.gz && \
+    rm prometheus-cpp-with-submodules.tar.gz && \
+    cd prometheus-cpp-with-submodules && mkdir _build && cd _build && \
+    cmake .. -DBUILD_SHARED_LIBS=ON -DENABLE_PUSH=OFF -DENABLE_COMPRESSION=OFF && \
+    cmake --build . --parallel 16 && ctest -V && \
+    cmake --install . && cmake --install ./pull && \
+    rm -rf /prometheus-cpp-with-submodules
