@@ -2,11 +2,10 @@
 
 IMAGE_NAME=aperturedb
 
-
 docker stop ${IMAGE_NAME} 
 docker rm ${IMAGE_NAME}
 
-cat Dockerfile.dependencies	Dockerfile.extra > Dockerfile
+cat Dockerfile.dependencies Dockerfile.python Dockerfile.extra > Dockerfile
 
 # Build image
 docker build --tag ${IMAGE_NAME} .

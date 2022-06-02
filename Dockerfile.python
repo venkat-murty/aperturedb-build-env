@@ -1,0 +1,15 @@
+# The command are from athena/docker/testing/Dockerfile
+
+RUN apt-get update && apt-get upgrade -y && \
+  apt-get install -y --no-install-recommends \
+    python3-pip libgflags-dev libgtest-dev libgl1-mesa-glx && \
+    pip3 install --upgrade pip && \
+  rm -rf /var/lib/apt/lists/* /root/.cache
+
+RUN pip3 install numpy opencv-python faiss-cpu
+RUN pip3 install requests boto3
+RUN pip3 install aperturedb
+
+# Make sure tests runs using Python3
+RUN ln -s /usr/bin/python3 /usr/bin/python
+

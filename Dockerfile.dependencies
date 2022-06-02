@@ -114,3 +114,36 @@ RUN wget -q https://github.com/jupp0r/prometheus-cpp/releases/download/v1.0.0/pr
     cmake --build . --parallel 16 && ctest -V && \
     cmake --install . && cmake --install ./pull && \
     rm -rf /prometheus-cpp-with-submodules
+
+#Install ICU
+RUN wget -q https://github.com/unicode-org/icu/releases/download/release-71-1/icu4c-71-src.tgz && \
+    tar xf icu4c-71_1-src.tgz && \
+    rm icu4c-71_1-src.tgz && \
+    cd icu/source && \
+    chmod +x runConfigureICU configure install-sh && \
+    ./runConfigureICU Linux/gcc && \
+    make && \
+    make install && \
+    cd ../.. && \
+    rm -rf /icu
+
+# Install lmdb
+RUN wget -q https://github.com/LMDB/lmdb/archive/refs/tags/LMDB_0.9.29.zip && \
+    unzip LMDB_0.9.29.zip && \
+    cd lmdb-LMDB_0.9.29/libraries/liblmdb && \
+    make && \
+    make install && \
+    cd ../../../ && \
+    rm -rf lmdb-LMDB_0.9.29 LMDB_0.9.29.zip
+    
+# Install roaring bitmap
+RUN wget -q https://github.com/lemire/CRoaringUnityBuild/archive/refs/tags/v0.5.0.zip && \
+  unzip v0.5.0.zip && \
+  cd CRoaringUnityBuild-0.5.0 && \
+  g++ -I. -c roaring.c && \
+  ar r libroaring.a roaring.o && \
+  cp roaring.h /usr/local/include/. && \
+  cp roaring.hh /usr/local/include/.  && \
+  cp libroaring.a /usr/local/lib/. && \
+  cd .. && \
+  rm -rf v0.5.0.zip CRoaringUnityBuild-0.5.0
