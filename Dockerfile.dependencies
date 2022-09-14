@@ -1,62 +1,22 @@
-# Pull base image.
-FROM ubuntu:20.04
 
-# This is needed to prevent locales installation from being interactive.
-ENV DEBIAN_FRONTEND=noninteractive
-
-RUN apt-get update && apt-get upgrade -y && \
-    apt-get install -y --no-install-recommends \
-        build-essential scons autoconf automake libtool make g++ \
-        git pkg-config \
-        wget ed curl bzip2 libbz2-dev unzip libarchive-tools \
-        openssh-client libssl-dev \
-        libjsoncpp-dev flex javacc bison libbison-dev openjdk-8-jdk \
-        libgflags-dev libgtest-dev \
-        libavcodec-dev libavformat-dev libswscale-dev \
-        libboost-all-dev \
-        libtbb-dev \
-        locales \
-        intel-mkl \
-        libjpeg-dev libpng-dev libtiff-dev \
-        libopenblas-dev && \
-    apt-get remove -y libprotobuf-dev protobuf-compiler && \
-    rm -rf /var/lib/apt/lists/* /root/.cache
-
-# CMake
-RUN wget -q https://cmake.org/files/v3.20/cmake-3.20.0.tar.gz && \
-    tar -xzvf cmake-3.20.0.tar.gz && cd cmake-3.20.0/ && \
-    ./bootstrap && make -j6 && make install
-
-# Google Logging
-RUN wget -q https://github.com/google/glog/archive/refs/tags/v0.5.0.tar.gz && \
-    tar -xzvf v0.5.0.tar.gz && cd glog-0.5.0 && \
-    cmake -S . -B build -G "Unix Makefiles" -DWITH_CUSTOM_PREFIX=ON && \
-    cmake --build build -DGLOG_CUSTOM_PREFIX_SUPPORT --target install && \
-    rm -rf /glog-0.5.0
-
-# Google Test
-RUN cd /usr/src/gtest && cmake . && make && mv ./lib/libgtest* /usr/local/lib/
-
-# Install locale
-RUN sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
-    dpkg-reconfigure --frontend=noninteractive locales
-
-# Protobuf
-RUN wget -q https://github.com/protocolbuffers/protobuf/archive/v3.9.0.tar.gz && \
-    tar xf v3.9.0.tar.gz && rm v3.9.0.tar.gz && \
-    cd protobuf-3.9.0 && ./autogen.sh &&  \
-    ./configure --prefix=/usr/local && \
-    make -j6 && \
-    make install && ldconfig && \
-    rm -rf /protobuf-3.9.0
+ENV OPENCV_VERSION=4.3.0
+ENV PROTOBUF_VERSION=3.9.0
+ENV TILEDB_VERSION=2.11.2
+ENV FAISS_VERSION=1.7.1
+ENV GLOG_VERSION=0.5.0
+ENV VALIJSON_VERSION=0.2
+ENV NLOHMANNJSON_VERSION=3.10.2
+ENV PROMETHEUS_VERSION=1.0.0
+ENV LMDB_VERSION=0.9.29
+ENV ROARINGBITMAP_VERSION=0.5.0
 
 # OpenCV
-RUN wget -q https://github.com/opencv/opencv/archive/4.3.0.tar.gz && \
-    tar xf 4.3.0.tar.gz && rm 4.3.0.tar.gz && \
-    cd opencv-4.3.0 && mkdir build && cd build && \
+RUN wget -q https://github.com/opencv/opencv/archive/$OPENCV_VERSION.tar.gz && \
+    tar xf $OPENCV_VERSION.tar.gz && rm $OPENCV_VERSION.tar.gz && \
+    cd opencv-$OPENCV_VERSION && mkdir build && cd build && \
     cmake                                               \
         -D CMAKE_BUILD_TYPE=Release                     \
-        -D WITH_TBB=ON -D WITH_OPENMP=ON -D WITH_IPP=ON \
+        -D WITH_TBB=OFF -D WITH_OPENMP=ON -D WITH_IPP=OFF \
         -D CPU_DISPATCH=SSE4_2,AVX,AVX2                 \
         -D BUILD_EXAMPLES=OFF                           \
         -D BUILD_DOCS=OFF                               \
@@ -65,48 +25,64 @@ RUN wget -q https://github.com/opencv/opencv/archive/4.3.0.tar.gz && \
         -D BUILD_opencv_apps=OFF                        \
         -D CMAKE_INSTALL_PREFIX=/usr/local .. &&        \
     make -j6 && make install && \
-    rm -rf /opencv-4.3.0
+    rm -rf /opencv-$OPENCV_VERSION
+
+# Protobuf
+RUN wget -q https://github.com/protocolbuffers/protobuf/archive/v$PROTOBUF_VERSION.tar.gz && \
+    tar xf v$PROTOBUF_VERSION.tar.gz && rm v$PROTOBUF_VERSION.tar.gz && \
+    cd protobuf-$PROTOBUF_VERSION && ./autogen.sh &&  \
+    ./configure --prefix=/usr/local && \
+    make -j6 && \
+    make install && ldconfig && \
+    rm -rf /protobuf-$PROTOBUF_VERSION
 
 # TileDB
-RUN wget -q https://github.com/TileDB-Inc/TileDB/archive/1.3.1.tar.gz && \
-    tar xf 1.3.1.tar.gz && rm 1.3.1.tar.gz && \
-    cd TileDB-1.3.1 && mkdir build && cd build && \
+RUN wget -q https://github.com/TileDB-Inc/TileDB/archive/$TILEDB_VERSION.tar.gz && \
+    tar xf $TILEDB_VERSION.tar.gz && rm $TILEDB_VERSION.tar.gz && \
+    cd TileDB-$TILEDB_VERSION && mkdir build && cd build && \
     ../bootstrap --prefix=/usr/local/ && make -j6 && make install-tiledb && \
-    rm -rf /TileDB-1.3.1
+    rm -rf /TileDB-$TILEDB_VERSION
 
 # Faiss
-RUN wget -q https://github.com/facebookresearch/faiss/archive/v1.7.0.tar.gz && \
-    tar xf v1.7.0.tar.gz && rm v1.7.0.tar.gz && \
-    cd faiss-1.7.0 && mkdir build && cd build && \
+RUN wget -q https://github.com/facebookresearch/faiss/archive/v$FAISS_VERSION.tar.gz && \
+    tar xf v$FAISS_VERSION.tar.gz && rm v$FAISS_VERSION.tar.gz && \
+    cd faiss-$FAISS_VERSION && mkdir build && cd build && \
     cmake                             \
         -D FAISS_ENABLE_GPU=OFF       \
         -D FAISS_ENABLE_PYTHON=OFF    \
         -D BUILD_TESTING=OFF          \
         -D BUILD_SHARED_LIBS=ON       \
-        -D CMAKE_BUILD_TYPE=Release   \
-        -D FAISS_OPT_LEVEL=avx2 .. && \
+        -D CMAKE_BUILD_TYPE=Release .. &&  \
     make -j6 && make install && \
-    ln -s /usr/local/lib/libfaiss_avx2.so /usr/local/lib/libfaiss.so && \
-    rm -rf /faiss-1.7*
+    rm -rf /faiss-$FAISS_VERSION
+
+# Google Logging
+RUN wget -q https://github.com/google/glog/archive/refs/tags/v$GLOG_VERSION.tar.gz && \
+    tar -xzvf v$GLOG_VERSION.tar.gz && cd glog-$GLOG_VERSION && \
+    cmake -S . -B build -G "Unix Makefiles" -DWITH_CUSTOM_PREFIX=ON && \
+    cmake --build build --target install && \
+    rm -rf /glog-$GLOG_VERSION
+
+# Google Test
+RUN cd /usr/src/gtest && cmake . && make && mv ./lib/libgtest* /usr/local/lib/
 
 # Valijson
-RUN wget -q https://github.com/tristanpenman/valijson/archive/v0.2.tar.gz && \
-    tar xf v0.2.tar.gz && rm v0.2.tar.gz && \
-    cd valijson-0.2 && \
+RUN wget -q https://github.com/tristanpenman/valijson/archive/v$VALIJSON_VERSION.tar.gz && \
+    tar xf v$VALIJSON_VERSION.tar.gz && rm v$VALIJSON_VERSION.tar.gz && \
+    cd valijson-$VALIJSON_VERSION && \
     cp -r include/* /usr/local/include/ && \
-    rm -r /valijson-0.2
+    rm -r /valijson-$VALIJSON_VERSION
 
 # JSON for Modern C++
-
-RUN wget -q https://github.com/nlohmann/json/archive/refs/tags/v3.10.2.zip && \
-    unzip v3.10.2.zip -d /usr/local/src && \
-    rm v3.10.2.zip && \
-    cmake -S /usr/local/src/json-3.10.2 -B /usr/local/build/nlohmann-json -DCMAKE_BUILD_TYPE=Release -DJSON_BuildTests=OFF && \
+RUN wget -q https://github.com/nlohmann/json/archive/refs/tags/v$NLOHMANNJSON_VERSION.zip && \
+    unzip v$NLOHMANNJSON_VERSION.zip -d /usr/local/src && \
+    rm v$NLOHMANNJSON_VERSION.zip && \
+    cmake -S /usr/local/src/json-$NLOHMANNJSON_VERSION -B /usr/local/build/nlohmann-json -DCMAKE_BUILD_TYPE=Release -DJSON_BuildTests=OFF && \
     cmake --build /usr/local/build/nlohmann-json --target install && \
-    rm -rf /usr/local/build/nlohmann-json /usr/local/src/json-3.10.2
+    rm -rf /usr/local/build/nlohmann-json /usr/local/src/json-$NLOHMANNJSON_VERSION
 
-#Install prometheus-cpp
-RUN wget -q https://github.com/jupp0r/prometheus-cpp/releases/download/v1.0.0/prometheus-cpp-with-submodules.tar.gz && \
+# Install prometheus-cpp
+RUN wget -q https://github.com/jupp0r/prometheus-cpp/releases/download/v$PROMETHEUS_VERSION/prometheus-cpp-with-submodules.tar.gz && \
     tar xf prometheus-cpp-with-submodules.tar.gz && \
     rm prometheus-cpp-with-submodules.tar.gz && \
     cd prometheus-cpp-with-submodules && mkdir _build && cd _build && \
@@ -115,35 +91,25 @@ RUN wget -q https://github.com/jupp0r/prometheus-cpp/releases/download/v1.0.0/pr
     cmake --install . && cmake --install ./pull && \
     rm -rf /prometheus-cpp-with-submodules
 
-#Install ICU
-RUN wget -q https://github.com/unicode-org/icu/releases/download/release-71-1/icu4c-71_1-src.tgz && \
-    tar xf icu4c-71_1-src.tgz && \
-    rm icu4c-71_1-src.tgz && \
-    cd icu/source && \
-    chmod +x runConfigureICU configure install-sh && \
-    ./runConfigureICU Linux/gcc && \
-    make && \
-    make install && \
-    cd ../.. && \
-    rm -rf /icu
-
 # Install lmdb
-RUN wget -q https://github.com/LMDB/lmdb/archive/refs/tags/LMDB_0.9.29.zip && \
-    unzip LMDB_0.9.29.zip && \
-    cd lmdb-LMDB_0.9.29/libraries/liblmdb && \
+RUN wget -q https://github.com/LMDB/lmdb/archive/refs/tags/LMDB_$LMDB_VERSION.zip && \
+    unzip LMDB_$LMDB_VERSION.zip && \
+    cd lmdb-LMDB_$LMDB_VERSION/libraries/liblmdb && \
     make && \
     make install && \
     cd ../../../ && \
-    rm -rf lmdb-LMDB_0.9.29 LMDB_0.9.29.zip
-    
+    rm -rf lmdb-LMDB_$LMDB_VERSION LMDB_$LMDB_VERSION.zip
+
 # Install roaring bitmap
-RUN wget -q https://github.com/lemire/CRoaringUnityBuild/archive/refs/tags/v0.5.0.zip && \
-  unzip v0.5.0.zip && \
-  cd CRoaringUnityBuild-0.5.0 && \
-  g++ -I. -c roaring.c && \
-  ar r libroaring.a roaring.o && \
-  cp roaring.h /usr/local/include/. && \
-  cp roaring.hh /usr/local/include/.  && \
-  cp libroaring.a /usr/local/lib/. && \
-  cd .. && \
-  rm -rf v0.5.0.zip CRoaringUnityBuild-0.5.0
+RUN wget -q https://github.com/lemire/CRoaringUnityBuild/archive/refs/tags/v$ROARINGBITMAP_VERSION.zip && \
+    unzip v$ROARINGBITMAP_VERSION.zip && \
+    cd CRoaringUnityBuild-$ROARINGBITMAP_VERSION && \
+    g++ -I. -c roaring.c && \
+    ar r libroaring.a roaring.o && \
+    cp roaring.h /usr/local/include/. && \
+    cp roaring.hh /usr/local/include/.  && \
+    cp libroaring.a /usr/local/lib/libroaring.$ROARINGBITMAP_VERSION.a && \
+    ln -s /usr/local/lib/libroaring.$ROARINGBITMAP_VERSION.a \
+          /usr/local/lib/libroaring.a && \
+    cd .. && \
+    rm -rf v$ROARINGBITMAP_VERSION.zip CRoaringUnityBuild-$ROARINGBITMAP_VERSION

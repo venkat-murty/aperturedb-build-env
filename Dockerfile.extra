@@ -7,10 +7,7 @@ RUN apt-get update && apt-get upgrade -y && \
 RUN pip3 install numpy opencv-python faiss-cpu
 RUN pip3 install requests boto3
 RUN pip3 install aperturedb
-
-# Make sure tests runs using Python3
-RUN ln -s /usr/bin/python3 /usr/bin/python
-
+RUN pip3 install clang-format==13.0.1.1
 
 RUN apt-get update && apt-get upgrade -y && \
      apt-get install -y sudo openssh-server vim

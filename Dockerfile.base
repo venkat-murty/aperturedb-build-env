@@ -1,0 +1,30 @@
+# Pull base image.
+FROM ubuntu:20.04
+
+# This is needed to prevent locales installation from being interactive.
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+        build-essential scons autoconf automake libtool make g++ \
+        git pkg-config \
+        wget ed curl bzip2 libbz2-dev unzip libarchive-tools \
+        openssh-client libssl-dev \
+        libjsoncpp-dev flex javacc bison libbison-dev openjdk-8-jdk \
+        libgflags-dev libgtest-dev \
+        libavcodec-dev libavformat-dev libswscale-dev \
+        libboost-all-dev \
+        locales \
+        libjpeg-dev libpng-dev libtiff-dev \
+        libopenblas-dev && \
+    apt-get remove -y libprotobuf-dev protobuf-compiler && \
+    rm -rf /var/lib/apt/lists/* /root/.cache
+
+# Install locale
+RUN sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
+    dpkg-reconfigure --frontend=noninteractive locales
+
+# CMake
+RUN wget -q https://cmake.org/files/v3.24/cmake-3.24.2.tar.gz && \
+    tar -xzvf cmake-3.24.2.tar.gz && cd cmake-3.24.2/ && \
+    ./bootstrap && make -j6 && make install
