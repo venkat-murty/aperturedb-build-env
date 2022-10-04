@@ -1,18 +1,13 @@
-RUN apt-get update && apt-get upgrade -y && \
-  apt-get install -y --no-install-recommends \
-    python3-pip libgflags-dev libgtest-dev libgl1-mesa-glx && \
-    pip3 install --upgrade pip && \
-  rm -rf /var/lib/apt/lists/* /root/.cache
 
-RUN pip3 install numpy opencv-python faiss-cpu
-RUN pip3 install requests boto3
-RUN pip3 install aperturedb
-RUN pip3 install clang-format==13.0.1.1
-
+RUN wget https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-13.0.1.tar.gz && \
+  tar -xzvf llvmorg-13.0.1.tar.gz && cd llvm-project-llvmorg-13.0.1/ && \
+  cmake -S llvm -B build -G "Unix Makefiles" -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra" -DCMAKE_INSTALL_PREFIX=/opt -DCMAKE_BUILD_TYPE=Release && \
+  cd build && make && mkdir -p /opt && make install && \
+  rm -rf /llvm-project-llvmorg-13.0.1
+   
 RUN apt-get update && apt-get upgrade -y && \
      apt-get install -y sudo openssh-server vim
 RUN mkdir /var/run/sshd
-
 
 # Users can sudo
 RUN mkdir -p /etc/sudoers.d
@@ -23,6 +18,7 @@ RUN echo 'root:root' |chpasswd
 RUN sed -ri 's/^#?PermitRootLogin\s+.*/PermitRootLogin yes/' /etc/ssh/sshd_config
 RUN sed -ri 's/UsePAM yes/#UsePAM yes/g' /etc/ssh/sshd_config
 
+COPY bashrc /tmp/bashrc
 COPY vimrc /tmp/vimrc
 COPY users /tmp/users
 COPY create_users.sh /tmp/create_users.sh
