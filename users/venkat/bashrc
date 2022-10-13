@@ -1,0 +1,1 @@
+alias scons='scons --build-debug -j8'
