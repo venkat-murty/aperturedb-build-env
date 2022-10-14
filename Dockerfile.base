@@ -7,7 +7,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         build-essential scons autoconf automake libtool make g++ \
-        git pkg-config \
+        git git-lfs pkg-config \
         wget ed curl bzip2 libbz2-dev unzip libarchive-tools \
         openssh-client libssl-dev \
         libjsoncpp-dev flex javacc bison libbison-dev openjdk-8-jdk \
