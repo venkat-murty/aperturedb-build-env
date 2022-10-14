@@ -6,7 +6,7 @@ RUN wget https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-13.0.1.t
   rm -rf /llvm-project-llvmorg-13.0.1
    
 RUN apt-get update && apt-get upgrade -y && \
-     apt-get install -y sudo openssh-server vim gdb
+     apt-get install -y sudo openssh-server vim gdb bc
 RUN mkdir /var/run/sshd
 
 # Users can sudo
