@@ -14,7 +14,6 @@ docker run \
   --detach \
   --name ${IMAGE_NAME} \
   --publish 2222:22 \
-  -v /Users/venkat/aperture-data:/home/venkat/aperture-data \
   ${IMAGE_NAME}
 
 
