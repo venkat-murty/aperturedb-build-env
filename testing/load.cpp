@@ -48,6 +48,15 @@ const unsigned DIMS = 128;
 
 std::vector<unsigned> timings;
 
+float r (double d)
+{
+    if (std::isnan(d)) return 0.0f;
+    if (std::isinf(d)) return 0.0f;
+    if (d >= std::numeric_limits<float>::max()) return std::numeric_limits<float>::max();
+    if (d <= std::numeric_limits<float>::lowest()) return std::numeric_limits<float>::lowest();
+    return static_cast<float> (d);
+}
+
 void batch_load(VDMSClient *client) {
   std::string ref(sizeof(float) * DIMS, '\0');
 
@@ -60,7 +69,7 @@ void batch_load(VDMSClient *client) {
 
     float *v = reinterpret_cast<float *>(mem[i].data());
     for (int d = 0; d < DIMS; ++d) {
-      v[d] = drand48();
+      v[d] = r(drand48());
     }
 
     json add_desc(objectValue);

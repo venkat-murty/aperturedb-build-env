@@ -119,6 +119,18 @@ void thread_fn(std::shared_ptr<VDMSClient> client, unsigned commands,
   }
 }
 
+float r(double d) {
+  if (std::isnan(d))
+    return 0.0f;
+  if (std::isinf(d))
+    return 0.0f;
+  if (d >= std::numeric_limits<float>::max())
+    return std::numeric_limits<float>::max();
+  if (d <= std::numeric_limits<float>::lowest())
+    return std::numeric_limits<float>::lowest();
+  return static_cast<float>(d);
+}
+
 int main(int argc, char *argv[]) {
 
   std::string ref(sizeof(float) * DIMS, '\0');
@@ -126,7 +138,7 @@ int main(int argc, char *argv[]) {
   for (unsigned i = 0; i < mem.size(); ++i) {
     float *v = reinterpret_cast<float *>(mem[i].data());
     for (int d = 0; d < DIMS; ++d) {
-      v[d] = drand48();
+      v[d] = r(drand48());
     }
   }
 
@@ -158,7 +170,8 @@ int main(int argc, char *argv[]) {
                   << " Count= " << count
                   << " Time_in_milliseconds= " << (mseconds / 1000)
                   << " Queries_per_seconds= "
-                  << (mseconds > 0 ? count * 1000 * 1000 / mseconds : 0) << std::endl;
+                  << (mseconds > 0 ? count * 1000 * 1000 / mseconds : 0) << " "
+                  << FIND << std::endl;
       }
     }
   }
