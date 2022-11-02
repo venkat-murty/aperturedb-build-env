@@ -125,12 +125,19 @@ int main(int argc, char *argv[]) {
   json request(arrayValue);
   {
     json add_desc_set(objectValue);
-
     add_desc_set["AddDescriptorSet"] = objectValue;
     add_desc_set["AddDescriptorSet"]["name"] = SET;
     add_desc_set["AddDescriptorSet"]["dimensions"] = DIMS;
 
     request.push_back(add_desc_set);
+
+    json index(objectValue);
+    index["CreateIndex"] = objectValue;
+    index["CreateIndex"]["index_type"] = "entity";
+    index["CreateIndex"]["class"] = "_Descriptor";
+    index["CreateIndex"]["property_key"] = "_create_txn";
+
+    request.push_back(index);
   }
 
   auto response = json::parse(conn->query(request.dump()).json);
