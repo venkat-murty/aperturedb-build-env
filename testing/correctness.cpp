@@ -204,13 +204,15 @@ void add(VDMSClient *client, uint64_t x, unsigned count) {
 }
 
 void add_all(VDMSClient *client) {
-  unsigned count = 1023;
+  unsigned count = 10;
   unsigned total = 0;
 
   T t;
   while (total < VECTORS) {
     add(client, total, std::min(count, VECTORS - total));
+    std::this_thread::sleep_for (std::chrono::seconds(2));
     total += count;
+    count *= 2;
   }
   std::cerr << "Add all in " << t.duration() << "ms" << std::endl;
 }
@@ -345,10 +347,24 @@ void exercise(VDMSClient *client) {
 
 void q_thread ()
 {
+  std::cerr << "Q thread" << std::endl;
+
   std::shared_ptr<VDMSClient> conn =
       std::make_shared<VDMSClient>("admin", "admin");
   auto client = conn.get();
-  while (true) query(client);
+
+  unsigned faults = 0;
+  unsigned count = 0;
+  while (true) {
+    if (!query(client)) faults++;
+    count++;
+
+    if (count == 1024) {
+      std::cerr << "Count " << count << " with faults " << faults << std::endl;
+      count = 0;
+      faults = 0;
+    }
+  }
 }
 
 int main(int argc, char *argv[]) {
@@ -363,4 +379,6 @@ int main(int argc, char *argv[]) {
 
   while (true)
     exercise(client);
+
+  th.join();
 }
