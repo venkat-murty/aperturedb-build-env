@@ -46,12 +46,12 @@ std::tuple<std::string, unsigned> exec(VDMSClient *client, std::string command,
 const char *SET = "RandomSet";
 const char *LABEL = "label";
 const unsigned DIMS = 128;
-const unsigned TOTAL = 1024;
+const unsigned TOTAL = 1024; // 100000;
 const char *FIND = "FindDescriptorBatch";
 
 std::array<unsigned, 3> THREADS{2, 4, 8};
-std::array<unsigned, 5> COMMANDS{1, 8, 16, 32, 64};
-std::array<unsigned, 5> DESCRIPTORS{1, 8, 16, 32, 64};
+std::array<unsigned, 1> COMMANDS{8};
+std::array<unsigned, 5> DESCRIPTORS{16, 32, 64};
 
 std::atomic<long long> count{0};
 std::atomic<long long> mseconds{0};
@@ -80,7 +80,8 @@ void thread_fn(std::shared_ptr<VDMSClient> client, unsigned commands,
       json find_desc(objectValue);
       find_desc[FIND]["set"] = SET;
       find_desc[FIND]["n_descriptors"] = descriptors;
-      find_desc[FIND]["k_neighbors"] = 10;
+      find_desc[FIND]["k_neighbors"] = 1;
+      find_desc[FIND]["knn_first"] = false;
 
       request.push_back(std::move(find_desc));
     }
@@ -113,8 +114,10 @@ void thread_fn(std::shared_ptr<VDMSClient> client, unsigned commands,
     }
 
     for (auto s : status) {
-      std::cerr << "Status = " << s.first << " count = " << s.second << "/"
-                << commands << " in " << ms << "ms" << std::endl;
+      if (s.first != 0) {
+        std::cerr << "Status = " << s.first << " count = " << s.second << "/"
+                  << commands << " in " << ms << "ms" << std::endl;
+      }
     }
   }
 }
@@ -154,13 +157,13 @@ int main(int argc, char *argv[]) {
         {
           count = 0;
           mseconds = 0;
-          std::list<std::thread> threads;
+          std::list<std::thread> thds;
           for (int i = 0; i < connections.size(); ++i) {
             auto conn = connections[i];
-            threads.emplace_back(thread_fn, conn, commands, descriptors,
+            thds.emplace_back(thread_fn, conn, commands, descriptors,
                                  std::ref(mem));
           }
-          std::for_each(threads.begin(), threads.end(),
+          std::for_each(thds.begin(), thds.end(),
                         [](auto &th) { th.join(); });
         }
 
@@ -170,7 +173,7 @@ int main(int argc, char *argv[]) {
                   << " Count= " << count
                   << " Time_in_milliseconds= " << (mseconds / 1000)
                   << " Queries_per_seconds= "
-                  << (mseconds > 0 ? count * 1000 * 1000 / mseconds : 0) << " "
+                  << (mseconds > 0 ? count * 1000.0 * 1000.0 / (1.0 * mseconds) : 0.0) << " "
                   << FIND << std::endl;
       }
     }

@@ -42,8 +42,8 @@ std::tuple<std::string, unsigned> exec(VDMSClient *client, std::string command,
 const char *SET = "RandomSet";
 const char *LABEL = "label";
 
-const unsigned BATCH = 4;
-const unsigned SIZE = BATCH * 10;
+const unsigned BATCH = 100000;
+const unsigned SIZE = BATCH * 17;
 const unsigned DIMS = 128;
 
 std::vector<unsigned> timings;
