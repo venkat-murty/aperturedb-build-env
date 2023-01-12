@@ -17,6 +17,7 @@ RUN apt-get update && apt-get upgrade -y && \
         locales \
         libcurl4-openssl-dev zlib1g-dev  \
         libjpeg-dev libpng-dev libtiff-dev \
+        libzookeeper-mt-dev zookeeperd \
         libopenblas-dev && \
     apt-get remove -y libprotobuf-dev protobuf-compiler && \
     rm -rf /var/lib/apt/lists/* /root/.cache
