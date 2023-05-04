@@ -1,0 +1,27 @@
+
+# Install zookeeper
+ARG ZOOKEEPER_VERSION=3.8.1
+RUN wget -q https://www.apache.org/dist/zookeeper/zookeeper-${ZOOKEEPER_VERSION}/apache-zookeeper-${ZOOKEEPER_VERSION}-bin.tar.gz && \
+    wget -q https://www.apache.org/dist/zookeeper/zookeeper-${ZOOKEEPER_VERSION}/apache-zookeeper-${ZOOKEEPER_VERSION}-bin.tar.gz.sha512 && \
+    sha512sum -c apache-zookeeper-${ZOOKEEPER_VERSION}-bin.tar.gz.sha512 && \
+    tar -C /opt -zxf apache-zookeeper-${ZOOKEEPER_VERSION}-bin.tar.gz && \
+    mv /opt/apache-zookeeper-${ZOOKEEPER_VERSION}-bin /opt/zookeeper && \
+    rm apache-zookeeper-${ZOOKEEPER_VERSION}-bin.tar.gz && \
+    rm apache-zookeeper-${ZOOKEEPER_VERSION}-bin.tar.gz.sha512
+
+RUN apt install -y --no-install-recommends \
+    python3-dev \
+    python3-pip \
+    libgl1-mesa-dev \
+    g++ \
+    gdb
+
+RUN pip3 install --upgrade pip
+RUN pip3 install \
+    pandas==1.5.3 \
+    numpy \
+    dbeval \
+    opencv-python \
+    requests \
+    boto3 \
+    aperturedb

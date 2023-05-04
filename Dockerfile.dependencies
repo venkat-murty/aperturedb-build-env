@@ -1,114 +1,118 @@
-ENV OPENCV_VERSION=4.3.0
-ENV PROTOBUF_VERSION=3.9.0
-ENV FAISS_VERSION=1.7.1
-ENV GLOG_VERSION=0.5.0
-ENV VALIJSON_VERSION=0.2
-ENV NLOHMANNJSON_VERSION=3.10.2
-ENV PROMETHEUS_VERSION=1.0.0
-ENV LMDB_VERSION=0.9.29
-ENV ROARINGBITMAP_VERSION=0.5.0
+FROM ubuntu:22.04
 
-# OpenCV
-RUN wget -q https://github.com/opencv/opencv/archive/$OPENCV_VERSION.tar.gz && \
-    tar xf $OPENCV_VERSION.tar.gz && rm $OPENCV_VERSION.tar.gz && \
-    cd opencv-$OPENCV_VERSION && mkdir build && cd build && \
-    cmake                                               \
-        -D CMAKE_BUILD_TYPE=Release                     \
-        -D WITH_TBB=OFF -D WITH_OPENMP=ON -D WITH_IPP=OFF \
-        -D CPU_DISPATCH=SSE4_2,AVX,AVX2                 \
-        -D BUILD_EXAMPLES=OFF                           \
-        -D BUILD_DOCS=OFF                               \
-        -D BUILD_PERF_TESTS=OFF                         \
-        -D BUILD_TESTS=OFF                              \
-        -D BUILD_opencv_apps=OFF                        \
-        -D CMAKE_INSTALL_PREFIX=/usr/local .. &&        \
-    make -j6 && make install && \
-    rm -rf /opencv-$OPENCV_VERSION
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt update && apt upgrade -y
+RUN apt install -y --no-install-recommends \
+    build-essential \
+    scons \
+    cmake \
+    git \
+    wget \
+    unzip \
+    protobuf-compiler \
+    openjdk-11-jre \
+    libtool \
+    libicu-dev \
+    libboost-dev \
+    libboost-random-dev \
+    libboost-date-time-dev \
+    libprotobuf-dev \
+    libssl-dev \
+    libopencv-dev \
+    libgtest-dev \
+    liblmdb-dev \
+    libsqlite3-dev \
+    libffmpeg-ocaml-dev \
+    libjsoncpp-dev \
+    libreadline-dev \
+    libcurl-ocaml-dev \
+    libopenblas-dev \
+    libzookeeper-mt-dev
 
-# Protobuf
-RUN wget -q https://github.com/protocolbuffers/protobuf/archive/v$PROTOBUF_VERSION.tar.gz && \
-    tar xf v$PROTOBUF_VERSION.tar.gz && rm v$PROTOBUF_VERSION.tar.gz && \
-    cd protobuf-$PROTOBUF_VERSION && ./autogen.sh &&  \
-    ./configure --prefix=/usr/local && \
-    make -j6 && \
-    make install && ldconfig && \
-    rm -rf /protobuf-$PROTOBUF_VERSION
-
-# Faiss
-RUN wget -q https://github.com/facebookresearch/faiss/archive/v$FAISS_VERSION.tar.gz && \
-    tar xf v$FAISS_VERSION.tar.gz && rm v$FAISS_VERSION.tar.gz && \
-    cd faiss-$FAISS_VERSION && mkdir build && cd build && \
-    cmake                             \
-        -D FAISS_ENABLE_GPU=OFF       \
-        -D FAISS_ENABLE_PYTHON=OFF    \
-        -D BUILD_TESTING=OFF          \
-        -D BUILD_SHARED_LIBS=ON       \
-        -D CMAKE_BUILD_TYPE=Release .. &&   \
-    make -j6 && make install && \
-    rm -rf /faiss-$FAISS_VERSION
+ENV JAVA_HOME="/usr/lib/jvm/java-11-openjdk-amd64/"
 
 # Google Logging
+ARG GLOG_VERSION=0.5.0
 RUN wget -q https://github.com/google/glog/archive/refs/tags/v$GLOG_VERSION.tar.gz && \
     tar -xzvf v$GLOG_VERSION.tar.gz && cd glog-$GLOG_VERSION && \
-    cmake -S . -B build -G "Unix Makefiles" -DWITH_CUSTOM_PREFIX=ON && \
-    cmake --build build --target install && \
-    rm -rf /glog-$GLOG_VERSION
+    cmake -S . -B build \
+        -D WITH_CUSTOM_PREFIX=ON \
+        -D CMAKE_BUILD_TYPE=Release \
+        -D BUILD_SHARED_LIBS=OFF \
+    && cmake --build build --parallel 16 && cmake --install build && \
+    cd .. && \
+    rm -rf glog-$GLOG_VERSION && \
+    rm v$GLOG_VERSION.tar.gz
 
-# Google Test
-RUN cd /usr/src/gtest && cmake . && make && mv ./lib/libgtest* /usr/local/lib/
+# Faiss
+ARG FAISS_VERSION=1.7.3
+RUN wget -q https://github.com/facebookresearch/faiss/archive/v${FAISS_VERSION}.tar.gz && \
+    tar xf v${FAISS_VERSION}.tar.gz && \
+    cd faiss-${FAISS_VERSION} && \
+    cmake -B build -S . \
+        -D CMAKE_BUILD_TYPE=Release \
+        -D BUILD_SHARED_LIBS=OFF \
+        -D FAISS_ENABLE_GPU=OFF \
+        -D FAISS_ENABLE_PYTHON=OFF \
+        -D BUILD_TESTING=OFF \
+    && cmake --build build --parallel 16 && cmake --install build && \
+    cd .. && \
+    rm -rf faiss-${FAISS_VERSION} && \
+    rm v${FAISS_VERSION}.tar.gz
 
 # Valijson
-RUN wget -q https://github.com/tristanpenman/valijson/archive/v$VALIJSON_VERSION.tar.gz && \
-    tar xf v$VALIJSON_VERSION.tar.gz && rm v$VALIJSON_VERSION.tar.gz && \
-    cd valijson-$VALIJSON_VERSION && \
+ARG VALIJSON_VERSION=1.0
+RUN wget -q https://github.com/tristanpenman/valijson/archive/v${VALIJSON_VERSION}.tar.gz && \
+    tar xf v${VALIJSON_VERSION}.tar.gz && rm v${VALIJSON_VERSION}.tar.gz && \
+    cd valijson-${VALIJSON_VERSION} && \
+    mkdir -p /usr/local/include && \
     cp -r include/* /usr/local/include/ && \
-    rm -r /valijson-$VALIJSON_VERSION
-
-# JSON for Modern C++
-RUN wget -q https://github.com/nlohmann/json/archive/refs/tags/v$NLOHMANNJSON_VERSION.zip && \
-    unzip v$NLOHMANNJSON_VERSION.zip -d /usr/local/src && \
-    rm v$NLOHMANNJSON_VERSION.zip && \
-    cmake -S /usr/local/src/json-$NLOHMANNJSON_VERSION -B /usr/local/build/nlohmann-json -DCMAKE_BUILD_TYPE=Release -DJSON_BuildTests=OFF && \
-    cmake --build /usr/local/build/nlohmann-json --target install && \
-    rm -rf /usr/local/build/nlohmann-json /usr/local/src/json-$NLOHMANNJSON_VERSION
+    cd .. && \
+    rm -r valijson-${VALIJSON_VERSION}
 
 # Install prometheus-cpp
-RUN wget -q https://github.com/jupp0r/prometheus-cpp/releases/download/v$PROMETHEUS_VERSION/prometheus-cpp-with-submodules.tar.gz && \
+ARG PROMETHEUS_VERSION=1.0.0
+RUN wget -q https://github.com/jupp0r/prometheus-cpp/releases/download/v${PROMETHEUS_VERSION}/prometheus-cpp-with-submodules.tar.gz && \
     tar xf prometheus-cpp-with-submodules.tar.gz && \
-    rm prometheus-cpp-with-submodules.tar.gz && \
-    cd prometheus-cpp-with-submodules && mkdir _build && cd _build && \
-    cmake .. -DBUILD_SHARED_LIBS=ON -DENABLE_PUSH=OFF -DENABLE_COMPRESSION=OFF && \
-    cmake --build . --parallel 16 && ctest -V && \
-    cmake --install . && cmake --install ./pull && \
-    rm -rf /prometheus-cpp-with-submodules
-
-# Install lmdb
-RUN wget -q https://github.com/LMDB/lmdb/archive/refs/tags/LMDB_$LMDB_VERSION.zip && \
-    unzip LMDB_$LMDB_VERSION.zip && \
-    cd lmdb-LMDB_$LMDB_VERSION/libraries/liblmdb && \
-    make && \
-    make install && \
-    cd ../../../ && \
-    rm -rf lmdb-LMDB_$LMDB_VERSION LMDB_$LMDB_VERSION.zip
+    cd prometheus-cpp-with-submodules && \
+    cmake -B build -S . \
+        -D CMAKE_BUILD_TYPE=Release \
+        -D BUILD_SHARED_LIBS=OFF \
+        -D ENABLE_PUSH=OFF \
+        -D ENABLE_COMPRESSION=OFF \
+    && cmake --build build --parallel 16 && \
+    cmake --install build && cmake --install build/pull && \
+    cd .. && \
+    rm -rf prometheus-cpp-with-submodules && \
+    rm prometheus-cpp-with-submodules.tar.gz
 
 # Install roaring bitmap
-RUN wget -q https://github.com/lemire/CRoaringUnityBuild/archive/refs/tags/v$ROARINGBITMAP_VERSION.zip && \
-    unzip v$ROARINGBITMAP_VERSION.zip && \
-    cd CRoaringUnityBuild-$ROARINGBITMAP_VERSION && \
+ARG ROARINGBITMAP_VERSION=0.5.0
+RUN wget -q https://github.com/lemire/CRoaringUnityBuild/archive/refs/tags/v${ROARINGBITMAP_VERSION}.zip && \
+    unzip -q v${ROARINGBITMAP_VERSION}.zip && \
+    cd CRoaringUnityBuild-${ROARINGBITMAP_VERSION} && \
     g++ -I. -c roaring.c && \
     ar r libroaring.a roaring.o && \
     cp roaring.h /usr/local/include/. && \
     cp roaring.hh /usr/local/include/.  && \
-    cp libroaring.a /usr/local/lib/libroaring.$ROARINGBITMAP_VERSION.a && \
-    ln -s /usr/local/lib/libroaring.$ROARINGBITMAP_VERSION.a \
-          /usr/local/lib/libroaring.a && \
+    cp libroaring.a /usr/local/lib/libroaring.${ROARINGBITMAP_VERSION}.a && \
+    ln -s /usr/local/lib/libroaring.${ROARINGBITMAP_VERSION}.a /usr/local/lib/libroaring.a && \
     cd .. && \
-    rm -rf v$ROARINGBITMAP_VERSION.zip CRoaringUnityBuild-$ROARINGBITMAP_VERSION
+    rm -rf CRoaringUnityBuild-${ROARINGBITMAP_VERSION} && \
+    rm v${ROARINGBITMAP_VERSION}.zip
 
-# Install aws-sdk
+# aws-sdk
+ARG AWS_SDK_VERSION=1.11.55
 RUN git clone --recurse-submodules https://github.com/aws/aws-sdk-cpp && \
-    cd aws-sdk-cpp/ && \
-    mkdir build && cd build/ && \
-    cmake ../ -DCMAKE_BUILD_TYPE=Release -DBUILD_ONLY="s3" -DMINIMIZE_SIZE=ON -DENABLE_TESTING=OFF && \
-    make && make install && ldconfig && \
-    rm -rf /aws-sdk-cpp
+    cd aws-sdk-cpp && \
+    git checkout ${AWS_SDK_VERSION} && \
+    git submodule update --init --recursive && \
+    cmake -B build -S . \
+        -D CMAKE_BUILD_TYPE=Release \
+        -D BUILD_SHARED_LIBS=OFF \
+        -D BUILD_ONLY="s3" \
+        -D MINIMIZE_SIZE=ON \
+        -D ENABLE_TESTING=OFF \
+    && cmake --build build --parallel 16 && cmake --install build && \
+    cd .. && \
+    rm -rf aws-sdk-cpp
