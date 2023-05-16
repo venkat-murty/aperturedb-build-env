@@ -1,0 +1,23 @@
+
+
+alias deps
+ : ..//external
+ ;
+
+
+alias libs
+  : xfoo
+  ;
+
+lib xfoo
+  : foo.cc
+    bar.cc
+    deps
+  ;
+
+unit-test foo_test
+  : foo_b2_test.cc
+    xfoo
+    ..//external_test
+  ;
+

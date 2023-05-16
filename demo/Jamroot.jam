@@ -1,0 +1,44 @@
+
+project aperturedb
+    : requirements
+      <include>.
+      <include>/opt/aperturedb/include
+      <link>static
+      <cxxstd>20
+      <debug-symbols>on
+      <cxxflags>-Wall
+      <cxxflags>-Wextra
+      <cxxflags>-Wconversion
+      <cxxflags>-Wuninitialized
+      <cxxflags>-Weffc++
+      <cxxflags>-Wno-non-virtual-dtor
+      <cxxflags>-Werror
+      <cxxflags>-isystem/opt/aperturedb/include
+      <visibility>hidden
+      <link>shared:<cxxflags>-DSOME_DEFINE=1
+    ;
+
+path-constant SCRIPTS_DIR : scripts ;
+
+using testing ;
+
+lib boost_thread        : : <name>boost_thread        <search>/opt/aperturedb/lib/ <search>/usr/lib ;
+lib boost_context       : : <name>boost_context       <search>/opt/aperturedb/lib/ <search>/usr/lib ;
+lib boost_filesystem    : : <name>boost_filesystem    <search>/opt/aperturedb/lib/ <search>/usr/lib ;
+lib boost_serialization : : <name>boost_serialization <search>/opt/aperturedb/lib/ <search>/usr/lib ;
+
+lib boost_unit_test_framework  : : <name>boost_unit_test_framework <search>/opt/aperturedb/lib/ <search>/usr/lib ;
+
+alias external :
+    boost_thread
+    boost_context
+    boost_filesystem
+    boost_serialization
+  ;    
+
+alias external_test
+   : boost_unit_test_framework
+     external
+   ;
+
+

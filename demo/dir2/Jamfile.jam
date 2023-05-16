@@ -1,0 +1,23 @@
+
+
+alias deps
+ : ..//external
+   ../dir1//libs
+ ;
+
+
+alias libs
+  : xfoobar
+  ;
+
+lib xfoobar
+  : foobar.cc
+    deps
+  ;
+
+unit-test foobar_test
+  : foobar_b2_test.cc
+    xfoobar
+    ..//external_test
+  ;
+
