@@ -15,9 +15,17 @@ lib xfoo
     deps
   ;
 
-unit-test foo_test
+unit-test xfoo_test
   : foo_b2_test.cc
     xfoo
     ..//external_test
   ;
+  
+unit-test foo_test
+  : foo_b2_test.cc
+    bar.cc
+    foo.cc
+    ..//external_test
+  ;
+
 
