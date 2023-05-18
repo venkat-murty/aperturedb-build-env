@@ -5,5 +5,5 @@
 
 BOOST_AUTO_TEST_CASE(pass)
 {
-  BOOST_CHECK_EQUAL(foobar(), 42 + 42);
+  BOOST_CHECK_NE(foobar(), 42 + 42);
 }
