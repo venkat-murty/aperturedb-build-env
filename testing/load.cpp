@@ -57,6 +57,7 @@ float r (double d)
     return static_cast<float> (d);
 }
 
+unsigned CNT = 0;
 void batch_load(VDMSClient *client) {
   std::string ref(sizeof(float) * DIMS, '\0');
 
@@ -108,46 +109,82 @@ void batch_load(VDMSClient *client) {
   }
 
   for (auto s : status) {
-    std::cerr << "Status = " << s.first << " count = " << s.second << "/"
+    std::cout << CNT << " Status = " << s.first << " count = " << s.second << "/"
               << BATCH << " in " << milliseconds << "ms" << std::endl;
   }
 }
 
 void load(VDMSClient *client) {
-  for (unsigned i = 0; i < SIZE; i += BATCH)
+  for (unsigned i = 0; i < SIZE; i += BATCH) {
+      CNT = i;
     batch_load(client);
+  }
 }
 
 int main(int argc, char *argv[]) {
   std::shared_ptr<VDMSClient> conn =
       std::make_shared<VDMSClient>("admin", "admin");
-
-  json request(arrayValue);
+    
+  json idx(arrayValue);
   {
-    json add_desc_set(objectValue);
-    add_desc_set["AddDescriptorSet"] = objectValue;
-    add_desc_set["AddDescriptorSet"]["name"] = SET;
-    add_desc_set["AddDescriptorSet"]["dimensions"] = DIMS;
-
-    request.push_back(add_desc_set);
-
     json index(objectValue);
     index["CreateIndex"] = objectValue;
     index["CreateIndex"]["index_type"] = "entity";
     index["CreateIndex"]["class"] = "_Descriptor";
     index["CreateIndex"]["property_key"] = "_create_txn";
 
-    request.push_back(index);
+    idx.push_back(index);
+  }
+  conn->query(idx.dump());
+
+    unsigned t = 0;
+  while (true) {
+    json update_request(arrayValue);
+    {
+      json cmd(objectValue);
+      cmd["UpdateDescriptorSet"] = objectValue;
+      cmd["UpdateDescriptorSet"]["with_name"] = SET;
+      cmd["UpdateDescriptorSet"]["build_index"] = true;
+      update_request.push_back(cmd);
+    }
+    conn->query(update_request.dump());
+
+    json del_request(arrayValue);
+    {
+      json add_desc_set(objectValue);
+      add_desc_set["DeleteDescriptorSet"] = objectValue;
+      add_desc_set["DeleteDescriptorSet"]["with_name"] = SET;
+      del_request.push_back(add_desc_set);
+    }
+    conn->query(del_request.dump());
+
+    json request(arrayValue);
+    {
+      json add_desc_set(objectValue);
+      add_desc_set["AddDescriptorSet"] = objectValue;
+      add_desc_set["AddDescriptorSet"]["name"] = SET;
+      add_desc_set["AddDescriptorSet"]["dimensions"] = DIMS;
+
+      add_desc_set["AddDescriptorSet"]["engine"] = arrayValue;
+      add_desc_set["AddDescriptorSet"]["engine"].push_back ("HNSW");
+
+      add_desc_set["AddDescriptorSet"]["metric"] = arrayValue;
+      add_desc_set["AddDescriptorSet"]["metric"].push_back ("L2");
+      add_desc_set["AddDescriptorSet"]["metric"].push_back ("IP");
+      add_desc_set["AddDescriptorSet"]["metric"].push_back ("CS");
+
+      request.push_back(add_desc_set);
+    }
+    auto response = json::parse(conn->query(request.dump()).json);
+    std::cout << ++t << " " <<  response.dump(4) << std::endl;
+  
+    load(conn.get());
+    conn->query(update_request.dump());
   }
 
-  auto response = json::parse(conn->query(request.dump()).json);
-  std::cerr << response.dump(4) << std::endl;
-
-  load(conn.get());
-
-  std::cerr << "Batch load size " << BATCH << "/" << SIZE << std::endl;
+  std::cout << "Batch load size " << BATCH << "/" << SIZE << std::endl;
   for (auto t : timings) {
-    std::cerr << t << "ms" << std::endl;
+    std::cout << t << "ms" << std::endl;
   }
   return 0;
 }
