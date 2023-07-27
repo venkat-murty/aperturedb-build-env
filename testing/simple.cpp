@@ -43,6 +43,7 @@ int main(int argc, char *argv[]) {
   std::shared_ptr<VDMSClient> conn =
       std::make_shared<VDMSClient>("admin", "admin", VDMSClientConfig{});
 
+  if (false) {
   json init(arrayValue);
   {
     json index(objectValue);
@@ -57,6 +58,7 @@ int main(int argc, char *argv[]) {
 
   auto response = json::parse(conn->query(init.dump()).json);
   std::cerr << response.dump(4) << std::endl;
+  }
 
   for (unsigned i = 0; i < 100; ++i) {
     int start = i * 1000000;

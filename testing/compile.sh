@@ -6,3 +6,4 @@ LIBS="-laperturedb-client -lvdms-utils -lcomm -lpthread -lprotobuf -lglog -lgfla
  g++ load.cpp -o load -std=c++2a ${CPPFLAGS} -I/usr/local/include -L/usr/local/lib ${LIBS} && \
  g++ query.cpp -o query  -std=c++2a ${CPPFLAGS} -I/usr/local/include -L/usr/local/lib ${LIBS} && \
  g++ correctness.cpp -o correctness  -std=c++2a  ${CPPFLAGS} -I/usr/local/include -L/usr/local/lib ${LIBS}
+ g++ qps.cpp -o qps  -std=c++2a  ${CPPFLAGS} -I/usr/local/include -L/usr/local/lib ${LIBS}
