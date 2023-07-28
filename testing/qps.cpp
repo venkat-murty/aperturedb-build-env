@@ -163,14 +163,17 @@ int main ()
 
         for (unsigned th = min_threads; th <= max_threads; th += inc_threads)
         {
+            unsigned q = queries / th;
+
             std::vector<unsigned> durations;
             for (unsigned t = 0; t < times; ++t) {
                 std::vector<std::thread> threads;
                 threads.reserve (th);
 
+
                 T time("run");
                 for (unsigned x = 0; x < th; ++x) {
-                    threads.emplace_back (thread_fn, connections[x].get(), requests, queries);
+                    threads.emplace_back (thread_fn, connections[x].get(), requests, q);
                 }
                 std::for_each (threads.begin(), threads.end(), [] (auto& a) { a.join(); });
 
@@ -180,7 +183,7 @@ int main ()
                 return total + elem;
             }) / durations.size();
 
-            std::cerr << "Entities = " << entities << " threads = " << th << " duration = " << avg << "ms for " << (queries * th) << " queries." << std::endl;
+            std::cerr << "Entities = " << entities << " threads = " << th << " duration = " << avg << "ms for " << (q * th) << " queries." << std::endl;
         }
     }
     return 0;
