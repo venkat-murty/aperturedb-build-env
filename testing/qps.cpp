@@ -31,7 +31,7 @@ struct T {
   }
 };
 
-unsigned BATCH = 10000;
+unsigned BATCH = 100000;
 
 std::vector<std::pair<unsigned, std::string>> filter;
 
@@ -78,11 +78,14 @@ unsigned load (VDMSClient* client, int elements, bool unique_ids) {
     static unsigned total = 0;
     static char ch = 'a';
 
+
     while (elements > 0) {
-        batch_load (total, client, unique_ids ? total : 0, std::string {ch++});
+        batch_load (total, client, unique_ids ? total : 0, std::string {ch});
         total += BATCH;
         elements -= BATCH;
     }
+    ++ch;
+
     return total;
 }
 
@@ -90,7 +93,7 @@ void thread_fn (VDMSClient* conn, const std::vector<std::string>& requests, unsi
 {
     unsigned idx = rand (requests.size());
     for (unsigned i = 0; i < queries; ++i) {
-        conn->query (requests[(i + idx) % requests.size()]);
+       conn->query (requests[(i + idx) % requests.size()]);
     }
 }
 
@@ -112,16 +115,16 @@ int main ()
    conn->query(idx.dump());
 
 
-    const unsigned min_threads = 2; // 10
-    const unsigned inc_threads = 2; // 10
-    const unsigned max_threads = 4; // 80
+    const unsigned min_threads = 10;
+    const unsigned inc_threads = 10;
+    const unsigned max_threads = 40; // 80
 
-    const unsigned rounds = 2;  // 10
+    const unsigned rounds = 10;
 
     // Elements added in each round.
-    const int elements    = 1000; // 1000000
+    const int elements    = 1000000;
     const bool unique_ids = true;
-    const unsigned queries = 10;  // 5000000
+    const unsigned queries = 5000000;
     const unsigned times   = 2;   // 3 Average of test runs.
 
 
@@ -156,6 +159,7 @@ int main ()
             request.push_back (find);
             requests.emplace_back (request.dump());
         }
+        std::cerr << "Loaded " << entities << std::endl;
 
         for (unsigned th = min_threads; th <= max_threads; th += inc_threads)
         {
@@ -176,7 +180,7 @@ int main ()
                 return total + elem;
             }) / durations.size();
 
-            std::cout << "Entities = " << entities << " threads = " << th << " duration = " << avg << "ms for " << queries << " queries." << std::endl;
+            std::cerr << "Entities = " << entities << " threads = " << th << " duration = " << avg << "ms for " << (queries * th) << " queries." << std::endl;
         }
     }
     return 0;
