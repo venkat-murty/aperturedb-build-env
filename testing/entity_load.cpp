@@ -92,10 +92,11 @@ double to_number(std::string const &s) {
   return 0.0;
 }
 
-void read_file(Queue &q, int batch) {
+void read_file(Queue &q, int batch, const char *model) {
   json request(arrayValue);
 
-  auto callback = [&request, &q, batch](std::vector<std::string> fields) {
+  auto callback = [&request, &q, batch,
+                   model](std::vector<std::string> fields) {
     if (!std::accumulate(fields.begin(), fields.end(), true,
                          [](bool result, const std::string &f) {
                            return result && f.size() < 256;
@@ -107,7 +108,7 @@ void read_file(Queue &q, int batch) {
       json add_entity(objectValue);
 
       add_entity["AddEntity"] = objectValue;
-      add_entity["AddEntity"]["class"] = "Row";
+      add_entity["AddEntity"]["class"] = model;
       add_entity["AddEntity"]["properties"] = objectValue;
 
       unsigned f = 0;
@@ -116,7 +117,7 @@ void read_file(Queue &q, int batch) {
       if (value(fields, f++))
         add_entity["AddEntity"]["properties"]["s3_url"] = fields[f - 1];
       if (value(fields, f++))
-        add_entity["AddEntity"]["properties"]["id"] = to_number(fields[f - 1]);
+        add_entity["AddEntity"]["properties"]["id"] = fields[f - 1];
       if (value(fields, f++))
         add_entity["AddEntity"]["properties"]["hash"] = fields[f - 1];
       if (value(fields, f++))
@@ -249,7 +250,7 @@ std::string now() {
   return std::move(timestamp.str());
 }
 
-void print_th() {
+void print_th(const char *model) {
   using namespace std::chrono_literals;
   {
     auto conn = connection();
@@ -259,7 +260,7 @@ void print_th() {
       json index(objectValue);
       index["CreateIndex"] = objectValue;
       index["CreateIndex"]["index_type"] = "entity";
-      index["CreateIndex"]["class"] = "Row";
+      index["CreateIndex"]["class"] = model;
       index["CreateIndex"]["property_key"] = "id";
 
       idx.push_back(index);
@@ -268,34 +269,46 @@ void print_th() {
   }
 
   auto start = high_resolution_clock::now();
+
+  std::array<std::pair<uint64_t, uint64_t>, 6> elements;
+  unsigned idx = elements.size();
   while (true) {
 
     std::this_thread::sleep_for(10000ms);
 
     auto tick = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(tick - start);
-    auto seconds = (duration.count() / 1000 / 1000);
+
+    uint64_t seconds = (duration.count() / 1000 / 1000);
+    uint64_t elem = inserted.load(std::memory_order_relaxed);
+
+    elements[idx % elements.size()] = std::make_pair(seconds, elem);
+    auto const &max = elements[idx % elements.size()];
+    ++idx;
+    auto const &min = elements[idx % elements.size()];
 
     std::cout << "Metrics: (" << now() << ") Tick = " << seconds
               << " Requests = " << requests.load(std::memory_order_relaxed)
               << " Successful = " << successful.load(std::memory_order_relaxed)
-              << " Inserted = " << inserted.load(std::memory_order_relaxed)
-              << std::endl;
+              << " Inserted = " << elem << " Instant Rate = "
+              << ((max.second - min.second) / (max.first - min.first))
+              << " Rate = " << (elem / seconds) << std::endl;
   }
 }
 
-void read_fn(Queue *queue, unsigned batch_size) {
-  read_file(*queue, batch_size);
+void read_fn(Queue *queue, unsigned batch_size, const char *model) {
+  read_file(*queue, batch_size, model);
 }
 
+const char *MODEL = "Row2";
 unsigned const BATCH = 200;
 unsigned const THREADS = 80;
 
 int main() {
   Queue queue;
 
-  std::thread q(read_fn, &queue, BATCH);
-  std::thread p(print_th);
+  std::thread q(read_fn, &queue, BATCH, MODEL);
+  std::thread p(print_th, MODEL);
 
   std::this_thread::sleep_for(10000ms);
 
