@@ -81,6 +81,17 @@ bool value(const std::vector<std::string> &fields, int idx) {
   return !fields.at(idx).empty();
 }
 
+double to_number(std::string const &s) {
+  try {
+    double v = std::stod(s);
+    if (v > std::numeric_limits<uint32_t>::lowest() &&
+        v < std::numeric_limits<uint32_t>::max())
+      return v;
+  } catch (...) {
+  }
+  return 0.0;
+}
+
 void read_file(Queue &q, int batch) {
   json request(arrayValue);
 
@@ -100,10 +111,12 @@ void read_file(Queue &q, int batch) {
       add_entity["AddEntity"]["properties"] = objectValue;
 
       unsigned f = 0;
+      add_entity["AddEntity"]["properties"]["cmd"] = request.size() + 1;
+
       if (value(fields, f++))
         add_entity["AddEntity"]["properties"]["s3_url"] = fields[f - 1];
       if (value(fields, f++))
-        add_entity["AddEntity"]["properties"]["id"] = std::stol(fields[f - 1]);
+        add_entity["AddEntity"]["properties"]["id"] = to_number(fields[f - 1]);
       if (value(fields, f++))
         add_entity["AddEntity"]["properties"]["hash"] = fields[f - 1];
       if (value(fields, f++))
@@ -117,18 +130,18 @@ void read_file(Queue &q, int batch) {
       }
       if (value(fields, f++))
         add_entity["AddEntity"]["properties"]["date_uploaded"] =
-            std::stol(fields[f - 1]);
+            to_number(fields[f - 1]);
       if (value(fields, f++))
         add_entity["AddEntity"]["properties"]["title"] = fields[f - 1];
       if (value(fields, f++))
         add_entity["AddEntity"]["properties"]["longitude"] =
-            std::stod(fields[f - 1]);
+            to_number(fields[f - 1]);
       if (value(fields, f++))
         add_entity["AddEntity"]["properties"]["latitude"] =
-            std::stod(fields[f - 1]);
+            to_number(fields[f - 1]);
       if (value(fields, f++))
         add_entity["AddEntity"]["properties"]["accuracy"] =
-            std::stod(fields[f - 1]);
+            to_number(fields[f - 1]);
       if (value(fields, f++))
         add_entity["AddEntity"]["properties"]["license"] = fields[f - 1];
 
@@ -173,6 +186,16 @@ bool exec(Queue *queue, VDMSClient *client) {
   auto j = json::parse(response.json);
 
   if (j.is_object() && j.find("status") != j.end()) {
+    if (j.find("info") != j.end() &&
+        j.at("info").get<std::string>() == "Not Authenticated!") {
+      std::cerr << "Not Authenticated" << std::endl;
+      return false;
+    }
+
+    std::cerr << json::parse(req).dump(4) << std::endl;
+    std::cerr << j.dump() << std::endl;
+
+    abort();
     return false;
   } else {
     successful.fetch_add(1, std::memory_order_relaxed);
@@ -235,7 +258,7 @@ void print_th() {
     conn->query(idx.dump());
   }
 
-  decltype(high_resolution_clock::now()) start;
+  auto start = high_resolution_clock::now();
   while (true) {
 
     std::this_thread::sleep_for(10000ms);
@@ -244,8 +267,8 @@ void print_th() {
     auto duration = duration_cast<microseconds>(tick - start);
     auto seconds = (duration.count() / 1000 / 1000);
 
-    std::cout << "Metrics: Requests = "
-              << requests.load(std::memory_order_relaxed)
+    std::cout << "Metrics: Tick = " << seconds
+              << " Requests = " << requests.load(std::memory_order_relaxed)
               << " Successful = " << successful.load(std::memory_order_relaxed)
               << " Inserted = " << inserted.load(std::memory_order_relaxed)
               << std::endl;
