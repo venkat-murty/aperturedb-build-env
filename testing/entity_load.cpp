@@ -240,6 +240,15 @@ void exec_th(Queue *queue) {
   }
 }
 
+std::string now() {
+  auto t = std::time(nullptr);
+  auto tm = *std::localtime(&t);
+
+  std::ostringstream timestamp;
+  timestamp << std::put_time(&tm, "%m/%d %H:%M:%S");
+  return std::move(timestamp.str());
+}
+
 void print_th() {
   using namespace std::chrono_literals;
   {
@@ -267,7 +276,7 @@ void print_th() {
     auto duration = duration_cast<microseconds>(tick - start);
     auto seconds = (duration.count() / 1000 / 1000);
 
-    std::cout << "Metrics: Tick = " << seconds
+    std::cout << "Metrics: (" << now() << ") Tick = " << seconds
               << " Requests = " << requests.load(std::memory_order_relaxed)
               << " Successful = " << successful.load(std::memory_order_relaxed)
               << " Inserted = " << inserted.load(std::memory_order_relaxed)
