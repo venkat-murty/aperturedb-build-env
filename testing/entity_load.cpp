@@ -5,12 +5,17 @@
 #include <iostream>
 #include <regex>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <nlohmann/json.hpp>
 
+#include "VDMSClient.h"
+#include "comm/Exception.h"
+
 using namespace std::chrono;
 using json = nlohmann::json;
+using namespace VDMS;
 
 const json nullValue(nlohmann::json::value_t::null);
 const json arrayValue(nlohmann::json::value_t::array);
@@ -28,7 +33,7 @@ void read_data_file(std::function<void(std::vector<std::string>)> process) {
 
   // The first line.
   std::getline(f, line);
-  std::cout << line << std::endl;
+  // std::cout << line << std::endl;
   // s3_url,id,hash,user_nsid,user_nickname,date_taken,date_uploaded,title,description,longitude,latitude,accuracy,license,constraint_id,format
 
   while (std::getline(f, line)) { /* read each line into line */
@@ -44,19 +49,19 @@ void read_data_file(std::function<void(std::vector<std::string>)> process) {
 #include <semaphore>
 
 struct Queue {
-  constexpr static size_t kSize = 1024;
+  constexpr static size_t kSize = 1024 * 1024;
 
-  std::array<std::string, kSize> requests;
+  std::vector<std::string> requests{kSize * 2};
 
   std::atomic_uint32_t head = 0;
   uint32_t tail = 0;
 
-  std::counting_semaphore<> acquire{kSize - 10};
+  std::counting_semaphore<> acquire{kSize};
   std::counting_semaphore<> release{0};
 
   void push(std::string request) {
     acquire.acquire();
-    requests[tail % kSize] = std::move(request);
+    requests[tail % requests.size()] = std::move(request);
     ++tail;
     release.release();
   }
@@ -64,7 +69,7 @@ struct Queue {
   std::string pop() {
     release.acquire();
     auto p = head.fetch_add(1, std::memory_order_relaxed);
-    auto result = std::move(requests[p % kSize]);
+    auto result = std::move(requests[p % requests.size()]);
     acquire.release();
     return result;
   }
@@ -135,16 +140,139 @@ void read_file(Queue &q, int batch) {
     if (request.size() >= batch) {
       q.push(request.dump());
       request = arrayValue;
-
-      std::cout << q.size() << std::endl;
     }
   };
 
   read_data_file(callback);
 }
 
-int main() {
+#define DB_HOST "yfcc100m.datasets.develop-cloud.aperturedata.io"
+// (utils/src/comm/ConnClient.cc:89:
+// comm::Exception={num=8,name='ConnectionError'})
 
+#define DB_PORT 55555
+// DB_USER="admin"
+// DB_PASS="admin"
+
+std::shared_ptr<VDMSClient> connection() {
+  std::cerr << "New connection " << std::endl;
+  VDMSClientConfig cfg;
+  cfg.addr = DB_HOST;
+  cfg.port = DB_PORT;
+  return std::make_shared<VDMSClient>("admin", "admin", cfg);
+}
+
+std::atomic_uint64_t inserted = 0;
+std::atomic_uint64_t requests = 0;
+std::atomic_uint64_t successful = 0;
+
+bool exec(Queue *queue, VDMSClient *client) {
+  std::string req = queue->pop();
+  auto response = client->query(req);
+  requests.fetch_add(1, std::memory_order_relaxed);
+  auto j = json::parse(response.json);
+
+  if (j.is_object() && j.find("status") != j.end()) {
+    return false;
+  } else {
+    successful.fetch_add(1, std::memory_order_relaxed);
+    uint64_t zeros = 0;
+    for (const auto &c : j) {
+      if (c.is_object() && c.find("status") != c.end()) {
+        if (c.at("status").get<int>() == 0)
+          ++zeros;
+      } else {
+        for (const auto &x : c) {
+          if (x.is_object() && x.find("status") != x.end()) {
+            if (x.at("status").get<int>() == 0)
+              ++zeros;
+          } else {
+            for (const auto &y : x) {
+              if (y.is_object() && y.find("status") != y.end()) {
+                if (y.at("status").get<int>() == 0)
+                  ++zeros;
+              }
+            }
+          }
+        }
+      }
+    }
+    inserted.fetch_add(zeros, std::memory_order_relaxed);
+  }
+  return true;
+}
+
+void exec_th(Queue *queue) {
+  while (true) {
+    try {
+      auto conn = connection();
+      while (exec(queue, conn.get())) {
+      }
+    } catch (comm::Exception e) {
+      std::cerr << e << std::endl;
+    } catch (...) {
+      std::cerr << "EXCEPTION " << std::endl;
+    }
+    std::this_thread::sleep_for(1000ms);
+  }
+}
+
+void print_th() {
+  using namespace std::chrono_literals;
+  {
+    auto conn = connection();
+
+    json idx(arrayValue);
+    {
+      json index(objectValue);
+      index["CreateIndex"] = objectValue;
+      index["CreateIndex"]["index_type"] = "entity";
+      index["CreateIndex"]["class"] = "Row";
+      index["CreateIndex"]["property_key"] = "id";
+
+      idx.push_back(index);
+    }
+    conn->query(idx.dump());
+  }
+
+  decltype(high_resolution_clock::now()) start;
+  while (true) {
+
+    std::this_thread::sleep_for(10000ms);
+
+    auto tick = high_resolution_clock::now();
+    auto duration = duration_cast<microseconds>(tick - start);
+    auto seconds = (duration.count() / 1000 / 1000);
+
+    std::cout << "Metrics: Requests = "
+              << requests.load(std::memory_order_relaxed)
+              << " Successful = " << successful.load(std::memory_order_relaxed)
+              << " Inserted = " << inserted.load(std::memory_order_relaxed)
+              << std::endl;
+  }
+}
+
+void read_fn(Queue *queue, unsigned batch_size) {
+  read_file(*queue, batch_size);
+}
+
+unsigned const BATCH = 200;
+unsigned const THREADS = 80;
+
+int main() {
   Queue queue;
-  read_file(queue, 200);
+
+  std::thread q(read_fn, &queue, BATCH);
+  std::thread p(print_th);
+
+  std::this_thread::sleep_for(10000ms);
+
+  const unsigned threads = THREADS;
+  std::vector<std::thread> th;
+  th.reserve(threads);
+
+  for (unsigned x = 0; x < threads; ++x) {
+    th.emplace_back(exec_th, &queue);
+  }
+  std::for_each(th.begin(), th.end(), [](auto &a) { a.join(); });
 }
